@@ -11,6 +11,7 @@ typedef enum {DATE_SIZE_ONLY, NO_PARALLEL} long_opt_values;
  * @brief function display_help displays a brief manual for the program usage
  * @param my_name is the name of the binary file
  * This function is provided with its code, you don't have to implement nor modify it.
+ * iii
  */
 void display_help(char *my_name) {
     printf("%s [options] source_dir destination_dir\n", my_name);
