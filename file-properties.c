@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <utility.h>
+#include <stdbool.h>
 
 /*!
  * @brief get_file_stats gets all of the required information for a file (inc. directories)
@@ -61,4 +62,18 @@ bool directory_exists(char *path_to_dir) {
  * Hint: try to open a file in write mode in the target directory.
  */
 bool is_directory_writable(char *path_to_dir) {
+    const char *temp_file_name = ".test_writable_file";
+    char temp_file_path[256];
+
+    snprintf(temp_file_path, sizeof(temp_file_path), "%s/%s", path_to_dir, temp_file_name);
+
+    FILE *temp_file = fopen(temp_file_path, "w");
+
+    if (temp_file != NULL) {
+        fclose(temp_file);
+        remove(temp_file_path);
+        return true;
+    } else {
+        return false;
+    }
 }
