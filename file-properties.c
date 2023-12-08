@@ -44,6 +44,14 @@ int compute_file_md5(files_list_entry_t *entry) {
  * @return true if directory exists, false else
  */
 bool directory_exists(char *path_to_dir) {
+    DIR *dir = opendir(path_to_dir);
+
+    if (dir != NULL) {
+      closedir(dir);
+      return true;
+    } else {
+      return false;
+    }
 }
 
 /*!
