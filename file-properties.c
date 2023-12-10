@@ -12,6 +12,12 @@
 #include <utility.h>
 #include <stdbool.h>
 
+#include <openssl/md5.h>
+
+#define BUFFER_SIZE 1024
+
+
+
 /*!
  * @brief get_file_stats gets all of the required information for a file (inc. directories)
  * @param the files list entry
@@ -28,26 +34,30 @@
  * @return -1 in case of error, 0 else
  */
 int get_file_stats(files_list_entry_t *entry) {
-    struct stat file_info;
-    if (stat(entry->path, &file_info) == -1) {
-        perror("Error: stat");
+    struct stat file_stat;
+
+    if (stat(entry->path_and_name, &file_stat) != 0) {
+        perror("stat");
         return -1;
     }
-    entry->mode = file_info.st_mode;
-    entry->size = file_info.st_size;
-    entry->mtime = file_info.st_mtime;
-    if (S_ISDIR(file_info.st_mode)) {
+
+    entry->mode = file_stat.st_mode;
+
+
+    if (S_ISDIR(file_stat.st_mode)) {
         entry->type = DOSSIER;
     } else {
+        entry->mtime = file_stat.st_mtime;
+        entry->size = file_stat.st_size;
         entry->type = FICHIER;
-    }
-    if (entry->type == FICHIER) {
-        if (compute_file_md5(entry) == -1) {
+        if (compute_file_md5(entry) != 0) {
             return -1;
         }
     }
+
     return 0;
 }
+
 
 /*!
  * @brief compute_file_md5 computes a file's MD5 sum
@@ -56,29 +66,32 @@ int get_file_stats(files_list_entry_t *entry) {
  * Use libcrypto functions from openssl/evp.h
  */
 int compute_file_md5(files_list_entry_t *entry) {
-    unsigned char md5[MD5_DIGEST_LENGTH];
-    FILE *file = fopen(entry->path, "rb");
-    if (file == NULL) {
-        perror("Error: fopen");
+    unsigned char buffer[BUFFER_SIZE];
+    unsigned char result[MD5_DIGEST_LENGTH];
+    int bytes_red;
+    int i;
+
+    FILE *file = fopen(entry->path_and_name, "rb");
+    if (!file) {
         return -1;
     }
-    MD5_CTX md5_context;
-    MD5_Init(&md5_context);
-    unsigned char data[1024];
-    int bytes;
-    while ((bytes = fread(data, 1, 1024, file)) != 0) {
-        MD5_Update(&md5_context, data, bytes);
+
+    MD5_CTX mdContext;
+    MD5_Init(&mdContext);
+
+    while ((bytes_red = fread(buffer, 1, BUFFER_SIZE, file)) != 0) {
+        MD5_Update(&mdContext, buffer, bytes_red);
     }
-    MD5_Final(md5, &md5_context);
+
+    MD5_Final(result, &mdContext);
+
+    for(i = 0; i < MD5_DIGEST_LENGTH; i++) {
+        sprintf(&entry->md5_sum[i*2], "%02x", result[i]);
+    }
+
     fclose(file);
-    char md5_string[MD5_DIGEST_LENGTH * 2 + 1];
-    for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
-        sprintf(md5_string + i * 2, "%02x", md5[i]);
-    }
-    strcpy(entry->md5sum, md5_string);
     return 0;
 }
-
 /*!
  * @brief directory_exists tests the existence of a directory
  * @path_to_dir a string with the path to the directory
