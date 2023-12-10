@@ -1,4 +1,6 @@
 #include <defines.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /*!
@@ -11,4 +13,16 @@
  * @return a pointer to the resulting path, NULL when concatenation failed
  */
 char *concat_path(char *result, char *prefix, char *suffix) {
+  
+  if (result == NULL || prefix == NULL || suffix == NULL) {
+    fprintf(stderr, "Erreur : Paramètres d'entrée non valides\n");
+    return NULL;
+  }
+  
+  if (snprintf(result, PATH_SIZE, "%s/%s", prefix, suffix) >= PATH_SIZE) {
+    fprintf(stderr, "Erreur : Le chemin résultant dépasse la taille maximale\n");
+    return NULL;
+  }
+  
+  return result;
 }
