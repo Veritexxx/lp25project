@@ -76,6 +76,13 @@ void make_list(files_list_t *list, char *target) {
  * @return a pointer to a dir, NULL if it cannot be opened
  */
 DIR *open_dir(char *path) {
+  DIR *dir = opendir(path);
+
+    if (dir == NULL) {
+        perror("Error opening directory");
+    }
+
+    return dir;
 }
 
 /*!
