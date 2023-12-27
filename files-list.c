@@ -83,6 +83,33 @@ files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
  * @return 0 in case of success, -1 else
  */
 int add_entry_to_tail(files_list_t *list, files_list_entry_t *entry) {
+    if (list == NULL || entry == NULL) {
+        return -1;  // Invalid parameters
+    }
+
+    files_list_entry_t *new_entry = malloc(sizeof(files_list_entry_t));
+    if (new_entry == NULL) {
+        return -1;  // Memory allocation failure
+    }
+
+    // Copy the data from the provided entry to the new entry
+    memcpy(new_entry, entry, sizeof(files_list_entry_t));
+
+    new_entry->next = NULL;
+    new_entry->prev = list->tail;
+
+    if (list->tail == NULL) {
+        // The list is empty, make the new entry the head as well
+        list->head = new_entry;
+    } else {
+        // Update the next pointer of the current tail
+        list->tail->next = new_entry;
+    }
+
+    // Update the tail pointer to the new entry
+    list->tail = new_entry;
+
+    return 0;  // Success
 }
 
 /*!
