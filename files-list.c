@@ -28,6 +28,50 @@ void clear_files_list(files_list_t *list) {
  *  @return a pointer to the added element if success, NULL else (out of memory)
  */
 files_list_entry_t *add_file_entry(files_list_t *list, char *file_path) {
+    if (list == NULL || file_path == NULL) {
+        return NULL;
+    }
+
+    // Check if the file already exists in the list
+    files_list_entry_t *existingEntry = find_entry_by_name(list, file_path, 0, 0);
+    if (existingEntry != NULL) {
+        return NULL;  // File already exists
+    }
+
+    // Create a new entry for the file
+    files_list_entry_t *newEntry = malloc(sizeof(files_list_entry_t));
+    if (newEntry == NULL) {
+        return NULL;  // Out of memory
+    }
+
+    // Initialize the new entry
+    strcpy(newEntry->path_and_name, file_path);
+
+    // Use get_file_stats to fill basic properties
+    if (get_file_stats(newEntry) != 0) {
+        // Failed to get file stats
+        free(newEntry);
+        return NULL;
+    }
+
+    // Use compute_file_md5 to calculate md5sum
+    if (compute_file_md5(newEntry) != 0) {
+        // Failed to compute md5sum
+        free(newEntry);
+        return NULL;
+    }
+
+    // Initialize other properties (next, prev) as needed
+    newEntry->next = NULL;
+    newEntry->prev = NULL;
+
+    // Add the entry to the tail of the list
+    if (add_entry_to_tail(list, newEntry) != 0) {
+        free(newEntry);
+        return NULL;  // Failed to add entry to the list
+    }
+
+    return newEntry;
 }
 
 /*!
