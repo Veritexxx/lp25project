@@ -92,4 +92,17 @@ DIR *open_dir(char *path) {
  * Relevant entries are all regular files and dir, except . and ..
  */
 struct dirent *get_next_entry(DIR *dir) {
+    if (dir == NULL) {
+        return NULL;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        // Check if the entry is relevant (not . or .. and is a regular file or directory)
+        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 && (entry->d_type == DT_REG || entry->d_type == DT_DIR)) {
+            return entry; // Relevant entry found
+        }
+    }
+  
+    return NULL;
 }
