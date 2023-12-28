@@ -4,6 +4,8 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <string.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 typedef enum {DATE_SIZE_ONLY, NO_PARALLEL} long_opt_values;
 
@@ -29,10 +31,10 @@ void display_help(char *my_name) {
  */
 void init_configuration(configuration_t *the_config) {
     the_config -> processes_count = 2;
-    the_config -> is_parallel = 1;
-    the_config -> is_dry_run = 0;
-    the_config -> is_verbose = 0;
-    the_config -> uses_md5 = 1;
+    the_config -> is_parallel = true;
+    the_config -> is_dry_run = false;
+    the_config -> is_verbose = false;
+    the_config -> uses_md5 = true;
 }
 
 /*!
@@ -43,4 +45,38 @@ void init_configuration(configuration_t *the_config) {
  * @return -1 if configuration cannot succeed, 0 when ok
  */
 int set_configuration(configuration_t *the_config, int argc, char *argv[]) {
+    DIR *source = opendir(argv[argc-2]);
+    DIR *destination = opendir(argv[argc-1]);
+    if (access(argv[argc-2], R_OK) && (access(argv[argc-1], W_OK) ||  mkdir(argv[argc-1], 0764))){
+        int opt = 0;
+        struct option my_opts[] = {
+                {.name="date-size-only",.has_arg=0,.flag=0,.val='m'},
+                {.name="no-parallel",.has_arg=0,.flag=0,.val='p'},
+                {.name="dry-run",.has_arg=0,.flag=0,.val='d'},
+                {.name=0,.has_arg=0,.flag=0,.val=0},
+        };
+        while((opt = getopt_long(argc, argv, "vn:", my_opts, NULL)) != -1) {
+            switch (opt) {
+                case 'v':
+                    the_config -> is_verbose = true;
+                    break;
+                case 'n':
+                    the_config -> processes_count = atoi(optarg);
+                    break;
+                case 'm':
+                    the_config -> uses_md5 = false;
+                    break;
+                case 'p':
+                    the_config -> is_parallel = false;
+                    break;
+                case 'd':
+                    the_config -> is_dry_run = true;
+                    break;
+            }
+        }
+        return 0;
+    }else{
+        display_help(argv[0]);
+        return -1;
+    }
 }
