@@ -1,6 +1,6 @@
 #include <file-properties.h>
 
-#include <sys/stat.h>
+
 #include <dirent.h>
 #include <openssl/evp.h>
 #include <unistd.h>
@@ -8,13 +8,14 @@
 #include <string.h>
 #include <defines.h>
 #include <fcntl.h>
-#include <stdio.h>
+
 #include <utility.h>
 #include <stdbool.h>
-
+// compute md5
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <openssl/md5.h>
-
-#define BUFFER_SIZE 1024
+#include <stdio.h>
 
 
 
@@ -34,25 +35,21 @@
  * @return -1 in case of error, 0 else
  */
 int get_file_stats(files_list_entry_t *entry) {
-    struct stat file_stat;
-
-    if (stat(entry->path_and_name, &file_stat) != 0) {
-        perror("stat");
+    struct stat fileStat;
+    if(stat(entry->path_and_name, &fileStat) < 0)    
         return -1;
-    }
 
-    entry->mode = file_stat.st_mode;
+    entry->mode = fileStat.st_mode;
+    entry->mtime = fileStat.st_mtim;
 
+    if(S_ISDIR(fileStat.st_mode))
+        entry->entry_type = DOSSIER;
+    else {
+        entry->entry_type = FICHIER;
+        entry->size = fileStat.st_size;
 
-    if (S_ISDIR(file_stat.st_mode)) {
-        entry->type = DOSSIER;
-    } else {
-        entry->mtime = file_stat.st_mtime;
-        entry->size = file_stat.st_size;
-        entry->type = FICHIER;
-        if (compute_file_md5(entry) != 0) {
+        if(compute_file_md5(entry) != 0)
             return -1;
-        }
     }
 
     return 0;
@@ -66,30 +63,22 @@ int get_file_stats(files_list_entry_t *entry) {
  * Use libcrypto functions from openssl/evp.h
  */
 int compute_file_md5(files_list_entry_t *entry) {
-    unsigned char buffer[BUFFER_SIZE];
-    unsigned char result[MD5_DIGEST_LENGTH];
-    int bytes_red;
-    int i;
+    FILE *inFile = fopen(entry->path_and_name, "rb");
+    MD5_CTX mdContext;
+    int bytes;
+    unsigned char data[1024];
 
-    FILE *file = fopen(entry->path_and_name, "rb");
-    if (!file) {
+    if (inFile == NULL) {
+        printf("%s can't be opened.\n", entry->path_and_name);
         return -1;
     }
 
-    MD5_CTX mdContext;
     MD5_Init(&mdContext);
+    while ((bytes = fread(data, 1, 1024, inFile)) != 0)
+        MD5_Update(&mdContext, data, bytes);
+    MD5_Final(entry->md5sum, &mdContext);
 
-    while ((bytes_red = fread(buffer, 1, BUFFER_SIZE, file)) != 0) {
-        MD5_Update(&mdContext, buffer, bytes_red);
-    }
-
-    MD5_Final(result, &mdContext);
-
-    for(i = 0; i < MD5_DIGEST_LENGTH; i++) {
-        sprintf(&entry->md5_sum[i*2], "%02x", result[i]);
-    }
-
-    fclose(file);
+    fclose(inFile);
     return 0;
 }
 /*!
