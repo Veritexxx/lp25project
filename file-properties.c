@@ -1,22 +1,19 @@
+// File includes
 #include <file-properties.h>
-
-
 #include <dirent.h>
-#include <openssl/evp.h>
-#include <unistd.h>
-#include <assert.h>
-#include <string.h>
-#include <defines.h>
 #include <fcntl.h>
-
 #include <utility.h>
-#include <stdbool.h>
-// compute md5
+#include <defines.h>
+
+// Librabry includes
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <openssl/evp.h>
+#include <assert.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <openssl/md5.h>
-#include <stdio.h>
-
+#include <stdbool.h>
 
 
 /*!
@@ -64,20 +61,37 @@ int get_file_stats(files_list_entry_t *entry) {
  */
 int compute_file_md5(files_list_entry_t *entry) {
     FILE *inFile = fopen(entry->path_and_name, "rb");
-    MD5_CTX mdContext;
-    int bytes;
+    EVP_MD_CTX *mdctx;
     unsigned char data[1024];
+    int bytes;
+    unsigned int md_len;
 
     if (inFile == NULL) {
         printf("%s can't be opened.\n", entry->path_and_name);
         return -1;
     }
 
-    MD5_Init(&mdContext);
-    while ((bytes = fread(data, 1, 1024, inFile)) != 0)
-        MD5_Update(&mdContext, data, bytes);
-    MD5_Final(entry->md5sum, &mdContext);
+    if((mdctx = EVP_MD_CTX_new()) == NULL)
+        return -1;
 
+    if(1 != EVP_DigestInit_ex(mdctx, EVP_md5(), NULL)) {
+        EVP_MD_CTX_free(mdctx);
+        return -1;
+    }
+
+    while ((bytes = fread(data, 1, 1024, inFile)) != 0) {
+        if(1 != EVP_DigestUpdate(mdctx, data, bytes)) {
+            EVP_MD_CTX_free(mdctx);
+            return -1;
+        }
+    }
+
+    if(1 != EVP_DigestFinal_ex(mdctx, entry->md5sum, &md_len)) {
+        EVP_MD_CTX_free(mdctx);
+        return -1;
+    }
+
+    EVP_MD_CTX_free(mdctx);
     fclose(inFile);
     return 0;
 }
