@@ -101,6 +101,10 @@ int compute_file_md5(files_list_entry_t *entry) {
  * @return true if directory exists, false else
  */
 bool directory_exists(char *path_to_dir) {
+    if (path_to_dir == NULL) {
+        return false;
+    }
+    
     DIR *dir = opendir(path_to_dir);
 
     if (dir != NULL) {
@@ -118,6 +122,10 @@ bool directory_exists(char *path_to_dir) {
  * Hint: try to open a file in write mode in the target directory.
  */
 bool is_directory_writable(char *path_to_dir) {
+    if (path_to_dir == NULL) {
+        return false;
+    }
+    
     const char *temp_file_name = ".test_writable_file";
     char temp_file_path[256];
 
