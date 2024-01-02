@@ -68,6 +68,33 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
  * @param target is the target dir whose content must be listed
  */
 void make_list(files_list_t *list, char *target) {
+  if (list == NULL || target == NULL) {
+        fprintf(stderr, "Error: Invalid input parameters.\n");
+        return;
+    }
+
+    DIR *dir = opendir(target);
+    if (dir == NULL) {
+        perror("Error opening directory");
+        return;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        // Skip "." and ".."
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        // Construct the full path
+        char file_path[4096];
+        snprintf(file_path, sizeof(file_path), "%s/%s", target, entry->d_name);
+
+        // Add the file entry to the list
+        add_file_entry(list, file_path);
+    }
+
+    closedir(dir);
 }
 
 /*!
