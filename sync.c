@@ -31,6 +31,20 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
  * @return true if both files are not equal, false else
  */
 bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
+  
+  if (has_md5 == true) {
+        for (int i = 0; i < 16; i++) {
+            if (lhd->md5sum[i] != rhd->md5sum[i]) {
+                return true;
+            }
+        }
+    }
+
+    if (lhd->size != rhd->size || lhd->mtime.tv_nsec != rhd->mtime.tv_nsec || lhd->mtime.tv_sec != rhd->mtime.tv_sec || lhd->mode != rhd->mode) {
+        return true;
+    } else {
+      return false;
+    }
 }
 
 /*!
