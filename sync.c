@@ -85,6 +85,38 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
  * Use sendfile to copy the file, mkdir to create the directory
  */
 void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t *the_config) {
+  
+  if (source_entry == NULL || the_config == NULL) {
+        fprintf(stderr, "Invalid arguments to copy_entry_to_destination\n");
+        return;
+  }
+  
+  char source[1024];
+  strcpy(source, the_config->source);
+  char destination[1024];
+  strcpy(destination, the_config->destination);
+
+  if (source_entry->entry_type == DOSSIER){
+    char path[PATH_SIZE];   
+    concat_path(path, destination, source_entry->path_and_name + strlen(the_config->source) + 1);
+    mkdir(path, source_entry->mode);
+  } else {
+    off_t offset = 0;
+    char source_file[PATH_SIZE];
+    char destination_file[PATH_SIZE];
+        
+    concat_path(source_file, source, source_entry->path_and_name);
+    concat_path(destination_file, destination, source_entry->path_and_name + strlen(the_config->source) + 1);
+
+    int fd_source, fd_destination;
+    fd_source = open(source_entry->path_and_name, O_RDONLY);
+    fd_destination = open(destination_file, O_WRONLY | O_CREAT | O_TRUNC, source_entry->mode);
+    sendfile(fd_destination, fd_source, &offset, source_entry->size);
+
+    close(fd_source);
+    close(fd_destination);
+  }
+  return;
 }
 
 /*!
