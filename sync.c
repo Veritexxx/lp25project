@@ -39,6 +39,19 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
  * @param target_path is the path whose files to list
  */
 void make_files_list(files_list_t *list, char *target_path) {
+  
+  if (list == NULL || target_path == NULL) {
+        fprintf(stderr, "Error: Invalid input parameters.\n");
+        return;
+    }
+
+    make_list(list, target_path);
+    
+    files_list_entry_t *p_entry = list->head;
+    while (p_entry != NULL) {
+        get_file_stats(p_entry);
+        p_entry = p_entry->next;
+    }
 }
 
 /*!
