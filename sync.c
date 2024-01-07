@@ -21,6 +21,33 @@
  * @param p_context is a pointer to the processes context
  */
 void synchronize(configuration_t *the_config, process_context_t *p_context) {
+
+  // création des listes de fichier
+  files_list_t *liste_source, *liste_dest;
+  make_files_list(source_list, the_config->source);
+  make_files_list(dest_list, the_config->destination);
+
+  // pointeur vers les entrées courantes
+  files_list_entry_t *current_entry = liste_source->head;
+  files_list_entry_t *current_dest;
+
+  // parcourir toutes les entrées du repertoire source
+  while (current_entry != NULL) {
+
+    // trouver l'entrée correspondante dans le repertoire de destination et la copier si besoin
+    files_list_entry_t *current_dest = find_entry_by_name(liste_dest, current_entry->path_and_name, 0 ,0);
+
+    // si l'entrée n'est pas trouvé
+    if (current_dest == NULL) {
+      copy_entry_to_destination(current_entry, the_config);
+    } else {
+      // si il y a une différence
+      if (mismatch(current_entry, current_dest, the_config->uses_md5)) {
+        copy_entry_to_destination(current_entry, the_config);
+      }
+    }
+    current_entry = current_entry->next;
+  }
 }
 
 /*!
@@ -31,20 +58,22 @@ void synchronize(configuration_t *the_config, process_context_t *p_context) {
  * @return true if both files are not equal, false else
  */
 bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
-  
-  if (has_md5 == true) {
-        for (int i = 0; i < 16; i++) {
-            if (lhd->md5sum[i] != rhd->md5sum[i]) {
-                return true;
-            }
-        }
-    }
 
-    if (lhd->size != rhd->size || lhd->mtime.tv_nsec != rhd->mtime.tv_nsec || lhd->mtime.tv_sec != rhd->mtime.tv_sec || lhd->mode != rhd->mode) {
+  // compare les sommes MD5 si activer
+  if (has_md5 == true) {
+    for (int i = 0; i < 16; i++) {
+      if (lhd->md5sum[i] != rhd->md5sum[i]) {
         return true;
-    } else {
-      return false;
+      }
     }
+  }
+
+  // compare les autres attributs des fichiers
+  if (lhd->size != rhd->size || lhd->mtime.tv_nsec != rhd->mtime.tv_nsec || lhd->mtime.tv_sec != rhd->mtime.tv_sec || lhd->mode != rhd->mode) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 /*!
@@ -53,19 +82,20 @@ bool mismatch(files_list_entry_t *lhd, files_list_entry_t *rhd, bool has_md5) {
  * @param target_path is the path whose files to list
  */
 void make_files_list(files_list_t *list, char *target_path) {
-  
+  //test erreur argument
   if (list == NULL || target_path == NULL) {
-        fprintf(stderr, "Error: Invalid input parameters.\n");
-        return;
-    }
+    fprintf(stderr, "Error: Invalid input parameters.\n");
+    return;
+  }
 
-    make_list(list, target_path);
-    
-    files_list_entry_t *p_entry = list->head;
-    while (p_entry != NULL) {
-        get_file_stats(p_entry);
-        p_entry = p_entry->next;
-    }
+  make_list(list, target_path);
+
+  // parcourt la liste et obtient les statistiques de chaque fichier
+  files_list_entry_t *p_entry = list->head;
+  while (p_entry != NULL) {
+    get_file_stats(p_entry);
+    p_entry = p_entry->next;
+  }
 }
 
 /*!
@@ -85,34 +115,40 @@ void make_files_lists_parallel(files_list_t *src_list, files_list_t *dst_list, c
  * Use sendfile to copy the file, mkdir to create the directory
  */
 void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t *the_config) {
-  
+  //test erreur argument
   if (source_entry == NULL || the_config == NULL) {
-        fprintf(stderr, "Invalid arguments to copy_entry_to_destination\n");
-        return;
+    fprintf(stderr, "Invalid arguments to copy_entry_to_destination\n");
+    return;
   }
-  
+
+  //initialisation
   char source[1024];
   strcpy(source, the_config->source);
   char destination[1024];
   strcpy(destination, the_config->destination);
 
+  //si dossier, créer dossier destination
   if (source_entry->entry_type == DOSSIER){
     char path[PATH_SIZE];   
     concat_path(path, destination, source_entry->path_and_name + strlen(the_config->source) + 1);
     mkdir(path, source_entry->mode);
   } else {
+    //si fichier, copie le fichier
     off_t offset = 0;
     char source_file[PATH_SIZE];
     char destination_file[PATH_SIZE];
-        
+
+    //construit les chemins des fichiers
     concat_path(source_file, source, source_entry->path_and_name);
     concat_path(destination_file, destination, source_entry->path_and_name + strlen(the_config->source) + 1);
 
+    //ouvre les fichiers
     int fd_source, fd_destination;
     fd_source = open(source_entry->path_and_name, O_RDONLY);
     fd_destination = open(destination_file, O_WRONLY | O_CREAT | O_TRUNC, source_entry->mode);
     sendfile(fd_destination, fd_source, &offset, source_entry->size);
 
+    //ferme les fichiers
     close(fd_source);
     close(fd_destination);
   }
@@ -127,33 +163,34 @@ void copy_entry_to_destination(files_list_entry_t *source_entry, configuration_t
  * @param target is the target dir whose content must be listed
  */
 void make_list(files_list_t *list, char *target) {
+  //test erreur argument
   if (list == NULL || target == NULL) {
-        fprintf(stderr, "Error: Invalid input parameters.\n");
-        return;
+    fprintf(stderr, "Error: Invalid input parameters.\n");
+    return;
+  }
+
+  //ouvre le dossier
+  DIR *dir = opendir(target);
+  if (dir == NULL) {
+    perror("Error opening directory");
+    return;
+  }
+
+  struct dirent *entry;
+  while ((entry = readdir(dir)) != NULL) {
+    // Skip "." and ".."
+    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+      continue;
     }
 
-    DIR *dir = opendir(target);
-    if (dir == NULL) {
-        perror("Error opening directory");
-        return;
-    }
+    // construit le chemin
+    char file_path[4096];
+    snprintf(file_path, sizeof(file_path), "%s/%s", target, entry->d_name);
 
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        // Skip "." and ".."
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-
-        // Construct the full path
-        char file_path[4096];
-        snprintf(file_path, sizeof(file_path), "%s/%s", target, entry->d_name);
-
-        // Add the file entry to the list
-        add_file_entry(list, file_path);
-    }
-
-    closedir(dir);
+    // ajoute le fichier dans la liste
+    add_file_entry(list, file_path);
+  }
+  closedir(dir);
 }
 
 /*!
@@ -163,12 +200,12 @@ void make_list(files_list_t *list, char *target) {
  */
 DIR *open_dir(char *path) {
   DIR *dir = opendir(path);
+  
+  if (dir == NULL) {
+    perror("Error opening directory");
+  }
 
-    if (dir == NULL) {
-        perror("Error opening directory");
-    }
-
-    return dir;
+  return dir;
 }
 
 /*!
@@ -178,17 +215,17 @@ DIR *open_dir(char *path) {
  * Relevant entries are all regular files and dir, except . and ..
  */
 struct dirent *get_next_entry(DIR *dir) {
-    if (dir == NULL) {
-        return NULL;
-    }
-
-    struct dirent *entry;
-    while ((entry = readdir(dir)) != NULL) {
-        // Check if the entry is relevant (not . or .. and is a regular file or directory)
-        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 && (entry->d_type == DT_REG || entry->d_type == DT_DIR)) {
-            return entry; // Relevant entry found
-        }
-    }
-  
+  if (dir == NULL) {
     return NULL;
+  }
+
+  struct dirent *entry;
+  while ((entry = readdir(dir)) != NULL) {
+    // Check if the entry is relevant (not . or .. and is a regular file or directory)
+    if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 && (entry->d_type == DT_REG || entry->d_type == DT_DIR)) {
+      return entry; // Relevant entry found
+    }
+  }
+  
+  return NULL;
 }
